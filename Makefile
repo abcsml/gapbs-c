@@ -12,9 +12,9 @@ ifneq (,$(findstring sunCC,$(CXX)))
 	PAR_FLAG = -xopenmp
 endif
 
-ifneq ($(SERIAL), 1)
-	CXX_FLAGS += $(PAR_FLAG)
-endif
+#ifneq ($(SERIAL), 1)
+#	CXX_FLAGS += $(PAR_FLAG)
+#endif
 
 KERNELS = bc bfs cc cc_sv pr pr_spmv sssp tc
 SUITE = $(KERNELS) converter
@@ -26,10 +26,10 @@ all: $(SUITE)
 	$(CXX) $(CXX_FLAGS) $< -o $@
 
 # Testing
-include test/test.mk
+# include test/test.mk
 
 # Benchmark Automation
-include benchmark/bench.mk
+# include benchmark/bench.mk
 
 
 .PHONY: clean
