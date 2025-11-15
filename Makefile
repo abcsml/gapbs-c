@@ -1,29 +1,29 @@
 # See LICENSE.txt for license details.
 
+CC ?= cc
+CXX ?= g++
+
 CXX_FLAGS += -std=c++11 -O3 -Wall
-PAR_FLAG = -fopenmp
-
-ifneq (,$(findstring icpc,$(CXX)))
-	PAR_FLAG = -openmp
-endif
-
-ifneq (,$(findstring sunCC,$(CXX)))
-	CXX_FLAGS = -std=c++11 -xO3 -m64 -xtarget=native
-	PAR_FLAG = -xopenmp
-endif
-
-#ifneq ($(SERIAL), 1)
-#	CXX_FLAGS += $(PAR_FLAG)
-#endif
+CC_FLAGS += -std=c11 -O3 -Wall -Isrcc
+LDLIBS += -lm
 
 KERNELS = bc bfs cc cc_sv pr pr_spmv sssp tc
 SUITE = $(KERNELS) converter
 
+SRCC_DIR = srcc
+SRC_DIR = src
+
+C_TARGETS := $(foreach bin,$(SUITE),$(if $(wildcard $(SRCC_DIR)/$(bin).c),$(bin),))
+CPP_TARGETS := $(filter-out $(C_TARGETS),$(SUITE))
+
 .PHONY: all
 all: $(SUITE)
 
-% : src/%.cc src/*.h
-	$(CXX) $(CXX_FLAGS) $< -o $@
+$(C_TARGETS): % : $(SRCC_DIR)/%.c $(SRCC_DIR)/*.h
+	$(CC) $(CC_FLAGS) $< -o $@ $(LDLIBS)
+
+# $(CPP_TARGETS): % : $(SRC_DIR)/%.cc $(SRC_DIR)/*.h
+# 	$(CXX) $(CXX_FLAGS) $< -o $@ $(LDLIBS)
 
 # Testing
 # include test/test.mk

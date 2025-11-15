@@ -210,10 +210,6 @@ static void BuilderEdgesToCSR(const Vector *edges, int64_t num_nodes,
   for (size_t i = 0; i < edge_count; ++i) {
     out_degrees[elist[i].u]++;
     in_degrees[elist[i].v]++;
-    if (symmetrize) {
-      out_degrees[elist[i].v]++;
-      in_degrees[elist[i].u]++;
-    }
   }
   SGOffset *out_offsets = (SGOffset *)malloc((num_nodes + 1) * sizeof(SGOffset));
   SGOffset *in_offsets = (SGOffset *)malloc((num_nodes + 1) * sizeof(SGOffset));
@@ -254,12 +250,6 @@ static void BuilderEdgesToCSR(const Vector *edges, int64_t num_nodes,
     SGOffset in_idx = in_positions[v]++;
     out_neighs[out_idx] = v;
     in_neighs[in_idx] = u;
-    if (symmetrize) {
-      SGOffset out_idx2 = out_positions[v]++;
-      SGOffset in_idx2 = in_positions[u]++;
-      out_neighs[out_idx2] = u;
-      in_neighs[in_idx2] = v;
-    }
   }
   free(out_positions);
   free(in_positions);
@@ -270,8 +260,7 @@ static void BuilderEdgesToCSR(const Vector *edges, int64_t num_nodes,
   free(out_offsets);
   free(in_offsets);
   bool directed = !symmetrize;
-  size_t logical_edges = symmetrize ? edge_count / 2 : edge_count;
-  int64_t stored_edges = (int64_t)logical_edges;
+  int64_t stored_edges = directed ? (int64_t)edge_count : (int64_t)(edge_count / 2);
   GraphInit(graph, directed, num_nodes, stored_edges,
             out_index, out_neighs, in_index, in_neighs);
   free(out_degrees);
@@ -289,10 +278,6 @@ static void BuilderWeightedEdgesToCSR(const Vector *edges, int64_t num_nodes,
   for (size_t i = 0; i < edge_count; ++i) {
     out_degrees[elist[i].u]++;
     in_degrees[elist[i].v.v]++;
-    if (symmetrize) {
-      out_degrees[elist[i].v.v]++;
-      in_degrees[elist[i].u]++;
-    }
   }
   SGOffset *out_offsets = (SGOffset *)malloc((num_nodes + 1) * sizeof(SGOffset));
   SGOffset *in_offsets = (SGOffset *)malloc((num_nodes + 1) * sizeof(SGOffset));
@@ -336,14 +321,6 @@ static void BuilderWeightedEdgesToCSR(const Vector *edges, int64_t num_nodes,
     out_neighs[out_idx].w = w;
     in_neighs[in_idx].v = u;
     in_neighs[in_idx].w = w;
-    if (symmetrize) {
-      SGOffset out_idx2 = out_positions[v]++;
-      SGOffset in_idx2 = in_positions[u]++;
-      out_neighs[out_idx2].v = u;
-      out_neighs[out_idx2].w = w;
-      in_neighs[in_idx2].v = v;
-      in_neighs[in_idx2].w = w;
-    }
   }
   free(out_positions);
   free(in_positions);
@@ -354,8 +331,7 @@ static void BuilderWeightedEdgesToCSR(const Vector *edges, int64_t num_nodes,
   free(out_offsets);
   free(in_offsets);
   bool directed = !symmetrize;
-  size_t logical_edges = symmetrize ? edge_count / 2 : edge_count;
-  int64_t stored_edges = (int64_t)logical_edges;
+  int64_t stored_edges = directed ? (int64_t)edge_count : (int64_t)(edge_count / 2);
   WGraphInit(graph, directed, num_nodes, stored_edges,
              out_index, out_neighs, in_index, in_neighs);
   free(out_degrees);
@@ -420,8 +396,9 @@ static void BuilderAppendSymmetry(Vector *edges, bool weighted) {
   if (original == 0)
     return;
   if (weighted) {
-    VectorResize(edges, original * 2);
     WEdge *elist = (WEdge *)VectorData(edges);
+    VectorResize(edges, original * 2);
+    elist = (WEdge *)VectorData(edges);
     for (size_t i = 0; i < original; ++i) {
       WEdge rev;
       rev.u = elist[i].v.v;
@@ -430,8 +407,9 @@ static void BuilderAppendSymmetry(Vector *edges, bool weighted) {
       elist[original + i] = rev;
     }
   } else {
-    VectorResize(edges, original * 2);
     Edge *elist = (Edge *)VectorData(edges);
+    VectorResize(edges, original * 2);
+    elist = (Edge *)VectorData(edges);
     for (size_t i = 0; i < original; ++i) {
       Edge rev;
       rev.u = elist[i].v;
@@ -501,6 +479,8 @@ static Graph BuilderRelabelByDegree(const Graph *g) {
     printf("Cannot relabel directed graph\n");
     exit(-11);
   }
+  Timer relabel_timer;
+  TimerStart(&relabel_timer);
   int64_t num_nodes = GraphNumNodes(g);
   DegreeNode *pairs = (DegreeNode *)malloc(sizeof(DegreeNode) * (size_t)num_nodes);
   if (pairs == NULL && num_nodes > 0)
@@ -555,6 +535,8 @@ static Graph BuilderRelabelByDegree(const Graph *g) {
   Graph relabeled;
   GraphInit(&relabeled, false, num_nodes, GraphNumEdges(g),
             index, neighs, index, neighs);
+  TimerStop(&relabel_timer);
+  PrintTime("Relabel", TimerSeconds(&relabel_timer));
   free(pairs);
   free(degrees);
   free(new_ids);
